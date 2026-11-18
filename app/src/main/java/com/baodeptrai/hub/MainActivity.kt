@@ -38,6 +38,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -180,11 +182,17 @@ fun KeyLoginScreen(onSuccess: () -> Unit) {
 @Composable
 fun MainHubScreen(onResetKey: () -> Unit) {
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("baodeptrai_prefs", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
 
     var hasShizuku by remember { mutableStateOf(isShizukuReady()) }
     var fileList by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    var destFolderUri by remember { mutableStateOf<Uri?>(null) }
+    var targetPath by remember {
+        mutableStateOf(
+            prefs.getString("last_target_path", "/storage/emulated/0/Android/data/")
+                ?: "/storage/emulated/0/Android/data/"
+        )
+    }
     var isProcessing by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
@@ -201,12 +209,6 @@ fun MainHubScreen(onResetKey: () -> Unit) {
         if (uris.isNotEmpty()) fileList = uris
     }
 
-    val pickFolderLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        if (uri != null) destFolderUri = uri
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -221,14 +223,14 @@ fun MainHubScreen(onResetKey: () -> Unit) {
         ) {
             Column {
                 Text("CONTROL HUB", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Color.White)
-                Text("Auto File Transfer • Shizuku", fontSize = 12.sp, color = Color(0xFF8E95A9))
+                Text("Shizuku Android/data Injector", fontSize = 12.sp, color = Color(0xFF8E95A9))
             }
             IconButton(onClick = onResetKey) {
                 Icon(Icons.Rounded.Logout, contentDescription = "Đăng xuất key", tint = Color(0xFF8E95A9))
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
 
         // Shizuku Status Card
         Card(
@@ -245,25 +247,25 @@ fun MainHubScreen(onResetKey: () -> Unit) {
                 )
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = if (hasShizuku) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
                     contentDescription = null,
                     tint = if (hasShizuku) Color(0xFF00E676) else Color(0xFFFF5252),
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(26.dp)
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (hasShizuku) "Shizuku đã sẵn sàng" else "Yêu cầu quyền Shizuku",
+                        text = if (hasShizuku) "Shizuku: Đã cấp quyền" else "Shizuku: Chưa sẵn sàng",
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontSize = 15.sp
+                        fontSize = 14.sp
                     )
                     Text(
-                        text = if (hasShizuku) "Đã cấp quyền thực thi" else "Bật Shizuku rồi bấm Cấp quyền",
+                        text = if (hasShizuku) "Sẵn sàng ghi vào Android/data" else "Bật Shizuku rồi bấm Cấp quyền",
                         color = Color.LightGray,
                         fontSize = 12.sp
                     )
@@ -274,7 +276,7 @@ fun MainHubScreen(onResetKey: () -> Unit) {
                             if (Shizuku.pingBinder()) {
                                 Shizuku.requestPermission(101)
                             } else {
-                                Toast.makeText(context, "Hãy mở app Shizuku và Start dịch vụ trước!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Mở app Shizuku và Start dịch vụ trước!", Toast.LENGTH_LONG).show()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
@@ -286,37 +288,36 @@ fun MainHubScreen(onResetKey: () -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
 
-        // Nút chọn Multi-file
+        // 1. Nút chọn Multi-file
         FilledTonalButton(
             onClick = { pickFilesLauncher.launch(arrayOf("*/*")) },
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp)
+            modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
             Icon(Icons.Rounded.FileCopy, contentDescription = null)
             Spacer(Modifier.width(10.dp))
             Text("1. Chọn nhiều File nguồn (${fileList.size} file)", fontWeight = FontWeight.SemiBold)
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // Nút chọn Thư mục đích
-        FilledTonalButton(
-            onClick = { pickFolderLauncher.launch(null) },
+        // 2. Ô nhập đường dẫn thư mục đích Android/data
+        OutlinedTextField(
+            value = targetPath,
+            onValueChange = {
+                targetPath = it
+                prefs.edit().putString("last_target_path", it).apply()
+            },
+            label = { Text("2. Thư mục đích (Android/data/...)") },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Rounded.FolderSpecial, contentDescription = null) },
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp)
-        ) {
-            Icon(Icons.Rounded.DriveFileMove, contentDescription = null)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = if (destFolderUri != null) "2. Đích: ${destFolderUri?.lastPathSegment}" else "2. Chọn thư mục đích",
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
-        }
+            modifier = Modifier.fillMaxWidth()
+        )
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
 
         // Danh sách file đã chọn
         Box(
@@ -329,7 +330,7 @@ fun MainHubScreen(onResetKey: () -> Unit) {
         ) {
             if (fileList.isEmpty()) {
                 Text(
-                    text = "Chưa có file nào được chọn...",
+                    text = "Chưa chọn file nguồn nào...",
                     color = Color(0xFF5A627A),
                     fontSize = 13.sp,
                     modifier = Modifier.align(Alignment.Center)
@@ -356,10 +357,11 @@ fun MainHubScreen(onResetKey: () -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
 
-        // 1 Nút chính thực thi Auto chuyển file
-        val canRun = hasShizuku && fileList.isNotEmpty() && destFolderUri != null && !isProcessing
+        // 3. Nút chính thực thi chép qua Shizuku
+        val cleanPath = targetPath.trim()
+        val canRun = hasShizuku && fileList.isNotEmpty() && cleanPath.startsWith("/") && !isProcessing
         val btnScale by animateFloatAsState(targetValue = if (canRun) 1f else 0.98f, label = "BtnScale")
 
         Button(
@@ -367,10 +369,10 @@ fun MainHubScreen(onResetKey: () -> Unit) {
             onClick = {
                 scope.launch {
                     isProcessing = true
-                    val done = executeTransfer(context, fileList, destFolderUri!!)
-                    delay(400)
+                    val done = transferViaShizuku(context, fileList, cleanPath)
+                    delay(350)
                     isProcessing = false
-                    Toast.makeText(context, "Hoàn tất! Đã chuyển $done/${fileList.size} file.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Đã chép $done/${fileList.size} file vào đích!", Toast.LENGTH_LONG).show()
                 }
             },
             shape = RoundedCornerShape(18.dp),
@@ -385,7 +387,7 @@ fun MainHubScreen(onResetKey: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
                         Spacer(Modifier.width(12.dp))
-                        Text("ĐANG AUTO CHUYỂN...", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("ĐANG CHÉP QUA SHIZUKU...", fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -407,27 +409,52 @@ fun isShizukuReady(): Boolean {
     }
 }
 
-suspend fun executeTransfer(context: Context, sources: List<Uri>, destTree: Uri): Int = withContext(Dispatchers.IO) {
+suspend fun transferViaShizuku(context: Context, sources: List<Uri>, destDirPath: String): Int = withContext(Dispatchers.IO) {
     var success = 0
-    val targetDir = DocumentFile.fromTreeUri(context, destTree) ?: return@withContext 0
+    val normalizedDest = destDirPath.trimEnd('/')
+
+    // Tạo sẵn thư mục đích bằng quyền Shizuku nếu chưa tồn tại
+    runShizukuShell("mkdir -p \"$normalizedDest\"")
+
     for (uri in sources) {
         try {
             val doc = DocumentFile.fromSingleUri(context, uri)
-            val fileName = doc?.name ?: "file_${System.currentTimeMillis()}"
-            val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val fileName = (doc?.name ?: "file_${System.currentTimeMillis()}").replace("\"", "\\\"")
 
-            targetDir.findFile(fileName)?.delete()
-            val outDoc = targetDir.createFile(mime, fileName) ?: continue
-
+            // 1. Copy file nguồn ra cache tạm của app để shell Shizuku đọc được đường dẫn thật
+            val tempFile = File(context.cacheDir, "temp_transfer_${System.nanoTime()}")
             context.contentResolver.openInputStream(uri)?.use { input ->
-                context.contentResolver.openOutputStream(outDoc.uri)?.use { output ->
+                FileOutputStream(tempFile).use { output ->
                     input.copyTo(output)
                 }
             }
-            success++
+
+            // 2. Dùng lệnh cp của Shizuku đẩy thẳng vào Android/data và xóa file tạm
+            val targetFilePath = "$normalizedDest/$fileName"
+            val exitCode = runShizukuShell("cp -f \"${tempFile.absolutePath}\" \"$targetFilePath\" && chmod 660 \"$targetFilePath\"")
+            tempFile.delete()
+
+            if (exitCode == 0) success++
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
     success
+}
+
+private fun runShizukuShell(command: String): Int {
+    return try {
+        val method = Shizuku::class.java.getDeclaredMethod(
+            "newProcess",
+            Array<String>::class.java,
+            Array<String>::class.java,
+            String::class.java
+        )
+        method.isAccessible = true
+        val process = method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+        process.waitFor()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        -1
+    }
 }
