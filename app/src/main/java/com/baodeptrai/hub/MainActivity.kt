@@ -2,6 +2,7 @@ package com.baodeptrai.hub
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -10,21 +11,77 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.Android
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.GppBad
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.rounded.NoteAdd
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,7 +141,6 @@ fun TypewriterHeader(
     var displayedText by remember { mutableStateOf("") }
     var cursorVisible by remember { mutableStateOf(true) }
 
-    // Hiệu ứng con trỏ nhấp nháy
     LaunchedEffect(Unit) {
         while (true) {
             delay(450)
@@ -92,16 +148,13 @@ fun TypewriterHeader(
         }
     }
 
-    // Hiệu ứng vừa đánh chữ vừa xóa lặp lại liên tục
     LaunchedEffect(Unit) {
         while (true) {
-            // Đánh từng chữ
             for (i in 1..targetText.length) {
                 displayedText = targetText.substring(0, i)
                 delay(140)
             }
-            delay(1300) // Dừng lại khi gõ xong
-            // Xóa từng chữ
+            delay(1300)
             for (i in targetText.length - 1 downTo 0) {
                 displayedText = targetText.substring(0, i)
                 delay(85)
@@ -131,7 +184,6 @@ fun TypewriterHeader(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Icon app phát sáng ở đầu chữ
             Box(
                 modifier = Modifier
                     .size(38.dp)
@@ -149,7 +201,6 @@ fun TypewriterHeader(
 
             Spacer(Modifier.width(12.dp))
 
-            // Chữ bao tools đánh máy + con trỏ
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = displayedText,
@@ -169,7 +220,9 @@ fun TypewriterHeader(
             }
         }
 
-        trailingContent?.invoke()
+        if (trailingContent != null) {
+            trailingContent()
+        }
     }
 }
 
@@ -221,7 +274,6 @@ fun KeyLoginScreen(onSuccess: () -> Unit) {
             )
             .padding(24.dp)
     ) {
-        // Thanh tiêu đề bao tools chạy chữ ở trên cùng
         TypewriterHeader(modifier = Modifier.align(Alignment.TopCenter))
 
         Column(
@@ -403,7 +455,6 @@ fun MainHubScreen(onResetKey: () -> Unit) {
             .padding(18.dp)
             .animateContentSize()
     ) {
-        // Thanh tiêu đề động bao tools + icon ở đầu chữ
         TypewriterHeader(
             trailingContent = {
                 IconButton(
@@ -420,7 +471,6 @@ fun MainHubScreen(onResetKey: () -> Unit) {
 
         Spacer(Modifier.height(14.dp))
 
-        // Thẻ trạng thái Shizuku
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = if (hasShizuku) Color(0xFF0D2822) else Color(0xFF2B121D)
@@ -471,66 +521,4 @@ fun MainHubScreen(onResetKey: () -> Unit) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Cấp quyền", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-
-        // 1. Nút chọn Multi-file
-        Surface(
-            onClick = { pickFilesLauncher.launch(arrayOf("*/*")) },
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF161B2E),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF8B5CF6).copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Rounded.NoteAdd, contentDescription = null, tint = Color(0xFFA78BFA))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("1. Chọn / Thêm File nguồn", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("Đang lưu ${fileList.size} file • Bấm để thêm tiếp", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                }
-                Icon(Icons.Rounded.AddCircleOutline, contentDescription = null, tint = Color(0xFFA78BFA))
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        // 2. Nút mở bảng chọn thư mục đích
-        Surface(
-            onClick = {
-                if (hasShizuku) {
-                    showFolderPicker = true
-                } else {
-                    Toast.makeText(context, "Hãy cấp quyền Shizuku trước để duyệt thư mục!", Toast.LENGTH_SHORT).show()
-                }
-            },
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFF161B2E),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, Color(0xFF06B6D4).copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp
+                        
