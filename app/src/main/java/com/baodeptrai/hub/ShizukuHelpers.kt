@@ -195,18 +195,32 @@ suspend fun transferViaShizuku(context: Context, sources: List<Uri>, destDirPath
     var ok = 0
     val dest = destDirPath.trimEnd('/')
     runShizukuShell("mkdir -p \"$dest\"")
+
+    // Dùng externalCacheDir (/storage/emulated/0/Android/data/...) để Shizuku shell đọc được không bị SELinux chặn
+    val sharedCache = context.externalCacheDir ?: context.cacheDir
+
     for (uri in sources) {
         try {
             val name = (DocumentFile.fromSingleUri(context, uri)?.name ?: "file_${System.currentTimeMillis()}").replace("\"", "\\\"")
-            val tmp = File(context.cacheDir, "tmp_${System.nanoTime()}")
-            context.contentResolver.openInputStream(uri)?.use { inp -> FileOutputStream(tmp).use { out -> inp.copyTo(out) } }
-            val exit = runShizukuShell("cp -f \"${tmp.absolutePath}\" \"$dest/$name\" && chmod 660 \"$dest/$name\"")
+            val tmp = File(sharedCache, "tmp_${System.nanoTime()}")
+
+            val opened = context.contentResolver.openInputStream(uri)?.use { inp ->
+                FileOutputStream(tmp).use { out -> inp.copyTo(out) }
+                true
+            } ?: false
+
+            if (!opened || !tmp.exists()) continue
+
+            val exit = runShizukuShell("cp -f \"${tmp.absolutePath}\" \"$dest/$name\"")
             tmp.delete()
             if (exit == 0) ok++
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
     ok
 }
+
 
 fun runShizukuShell(command: String): Int = try {
     val m = Shizuku::class.java.getDeclaredMethod("newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java)
